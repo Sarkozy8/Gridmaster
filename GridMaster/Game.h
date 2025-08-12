@@ -3,25 +3,67 @@
 #include <SDL3_image/SDL_image.h>
 #include <memory>
 #include <iostream>
+#include "Load_media.h"
+#include "Border.h"
+#include "Board.h"
+#include "Clock.h"
+#include "Mines.h"
+#include "Face.h"
+
+#define WINDOW_WIDTH 328
+#define WINDOW_HEIGHT 414
+
+#define PIECE_SIZE 16
+
+#define BORDER_HEIGHT 55
+#define BORDER_LEFT 4
+
+#define DIGIT_BACK_WIDTH 41
+#define DIGIT_BACK_HEIGHT 25
+#define DIGIT_BACK_TOP 15
+#define DIGIT_BACK_LEFT 15
+#define DIGIT_BACK_RIGHT 3
+
+#define DIGIT_WIDTH 13
+#define DIGIT_HEIGHT 23
+
+#define FACE_SIZE 26
+#define FACE_TOP 15
 
 class Game
 {
   public:
+    // Initialize all objects
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
+    struct Border *border = nullptr;
+    struct Board *board = nullptr;
+    struct Mines *mines = nullptr;
+    struct Clock *clock = nullptr;
+    struct Face *face = nullptr;
     SDL_Event event;
-    bool isRunning = false;
-    const int height = 700;
-    const int width = 500;
 
+    // Game state variables
+    bool isRunning = false;
+    bool isPlaying = false;
+
+    // Timing variables
     Uint64 lastFrameTime = 0;
 
-    bool Init();
-    void Run();
+    // Game configuration (Do not change Rows and Columns values, it is not implemented yet)
+    unsigned int rows = 9;
+    unsigned int columns = 9;
+    unsigned int mineCount = 10;
+
+    bool Init(); // Initialize the game
+    void Run();  // Main game loop
 
   private:
-    void HandleEvents();
-    void UpdateState();
-    void Render();
+    void GameMouseDown(float x, float y, Uint8 button);
+    bool GameMouseUp(float x, float y, Uint8 button);
+    bool GameReset();    // Reset the board (It happens when mouse up in face)
+    void HandleEvents(); // Handles all the events / Inputs
+    void UpdateState();  // Only updates FPS for now
+    void Render();       // Render all the objects
     void Quit();
 };
