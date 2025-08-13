@@ -9,6 +9,7 @@
 #include "Clock.h"
 #include "Mines.h"
 #include "Face.h"
+#include "Helper.h"
 
 #define WINDOW_WIDTH 328
 #define WINDOW_HEIGHT 414
@@ -35,17 +36,21 @@ class Game
   public:
     // Initialize all objects
     SDL_Window *window = nullptr;
+    SDL_Window *windowHelper = nullptr;
     SDL_Renderer *renderer = nullptr;
+    SDL_Renderer *rendererHelper = nullptr;
     struct Border *border = nullptr;
     struct Board *board = nullptr;
     struct Mines *mines = nullptr;
     struct Clock *clock = nullptr;
     struct Face *face = nullptr;
+    struct Helper *helper = nullptr;
     SDL_Event event;
 
     // Game state variables
     bool isRunning = false;
     bool isPlaying = false;
+    int gamePhase = 0; // How many times the player won essentially
 
     // Timing variables
     Uint64 lastFrameTime = 0;
@@ -53,7 +58,7 @@ class Game
     // Game configuration (Do not change Rows and Columns values, it is not implemented yet)
     unsigned int rows = 9;
     unsigned int columns = 9;
-    unsigned int mineCount = 10;
+    unsigned int mineCount = 1;
 
     bool Init(); // Initialize the game
     void Run();  // Main game loop

@@ -15,6 +15,8 @@ struct Board
     SDL_FRect *src_rects = nullptr;
     unsigned **front_array = nullptr;
     unsigned **back_array = nullptr;
+    unsigned **nuclear_array = nullptr;
+    unsigned **proximity_array = nullptr;
     unsigned rows;
     unsigned columns;
     float piece_size;
@@ -26,6 +28,7 @@ struct Board
     enum GameState game_state;
     bool first_turn;
     int mine_marked;
+    int gamePhase = 0;
 };
 
 struct Node
@@ -37,10 +40,10 @@ struct Node
 
 bool board_new(struct Board **board, SDL_Renderer *renderer, unsigned rows, unsigned columns, int mine_count);
 void board_free(struct Board **board);
-bool board_reset(struct Board *b, int mine_count, bool full_reset);
+bool board_reset(struct Board *b, int mine_count, bool full_reset, int gamePhase);
 enum GameState board_game_state(const struct Board *b);
 int board_mine_marked(const struct Board *b);
 bool board_is_pressed(const struct Board *b);
 void board_mouse_down(struct Board *b, float x, float y, Uint8 button);
-bool board_mouse_up(struct Board *b, float x, float y, Uint8 button);
+bool board_mouse_up(struct Board *b, float x, float y, Uint8 button, const int &gamePhase);
 void board_draw(const struct Board *b);

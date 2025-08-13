@@ -7,6 +7,7 @@ bool board_push_check(struct Board *b, int row, int column);
 struct Node board_pop_check(struct Board *b);
 void board_reveal(struct Board *b);
 void board_check_won(struct Board *b);
+void board_assign_special_mines_arrays(struct Board *b, int type, int row, int column);
 
 // Initializes a new board
 bool board_new(struct Board **board, SDL_Renderer *renderer, unsigned rows, unsigned columns, int mine_count)
@@ -35,7 +36,7 @@ bool board_new(struct Board **board, SDL_Renderer *renderer, unsigned rows, unsi
         return false;
     }
 
-    if (!board_reset(b, b->mine_count, true))
+    if (!board_reset(b, b->mine_count, true, b->gamePhase))
     {
         return false;
     }
@@ -72,6 +73,34 @@ void board_free_arrays(struct Board *b)
         }
         delete[] b->back_array;
         b->back_array = nullptr;
+    }
+
+    if (b->nuclear_array)
+    {
+        for (unsigned row = 0; row < b->rows; row++)
+        {
+            if (b->nuclear_array[row])
+            {
+                delete[] b->nuclear_array[row];
+                b->nuclear_array[row] = nullptr;
+            }
+        }
+        delete[] b->nuclear_array;
+        b->nuclear_array = nullptr;
+    }
+
+    if (b->proximity_array)
+    {
+        for (unsigned row = 0; row < b->rows; row++)
+        {
+            if (b->proximity_array[row])
+            {
+                delete[] b->proximity_array[row];
+                b->proximity_array[row] = nullptr;
+            }
+        }
+        delete[] b->proximity_array;
+        b->proximity_array = nullptr;
     }
 }
 
@@ -142,12 +171,46 @@ bool board_allocate_arrays(struct Board *b)
         }
     }
 
+    b->nuclear_array = new (std::nothrow) unsigned *[b->rows];
+    if (!b->nuclear_array)
+    {
+        std::cerr << "Error in Allocating nuclear array of rows.\n";
+        return false;
+    }
+
+    for (unsigned row = 0; row < b->rows; row++)
+    {
+        b->nuclear_array[row] = new (std::nothrow) unsigned[b->columns]();
+        if (b->nuclear_array[row] == NULL)
+        {
+            std::cerr << "Error in allocating nuclear array of columns.\n";
+            return false;
+        }
+    }
+
+    b->proximity_array = new (std::nothrow) unsigned *[b->rows];
+    if (!b->proximity_array)
+    {
+        std::cerr << "Error in Allocating proximity array of rows.\n";
+        return false;
+    }
+    for (unsigned row = 0; row < b->rows; row++)
+    {
+        b->proximity_array[row] = new (std::nothrow) unsigned[b->columns]();
+        if (b->proximity_array[row] == NULL)
+        {
+            std::cerr << "Error in allocating proximity array of columns.\n";
+            return false;
+        }
+    }
+
     return true;
 }
 
-bool board_reset(struct Board *b, int mine_count, bool full_reset)
+bool board_reset(struct Board *b, int mine_count, bool full_reset, int gamePhase)
 {
     b->mine_count = mine_count;
+    b->gamePhase = gamePhase;
 
     // Resets the board, either fully or partially
     if (full_reset)
@@ -180,6 +243,16 @@ bool board_reset(struct Board *b, int mine_count, bool full_reset)
         }
     }
 
+    // Clear the nuclear and proximity arrays in case of a partial reset
+    for (unsigned row = 0; row < b->rows; row++)
+    {
+        for (unsigned column = 0; column < b->columns; column++)
+        {
+            b->nuclear_array[row][column] = 0;
+            b->proximity_array[row][column] = 0;
+        }
+    }
+
     // Add mines to the back array
     int add_mines = b->mine_count;
     while (add_mines > 0)
@@ -188,6 +261,18 @@ bool board_reset(struct Board *b, int mine_count, bool full_reset)
         int c = rand() % (int)b->columns;
         if (!b->back_array[r][c])
         {
+            int mine_type = 1 + rand() % 3;
+            if (mine_type == 2 && b->gamePhase > 0)
+            {
+                b->nuclear_array[r][c] = 2; // Proximity mine
+                board_assign_special_mines_arrays(b, mine_type, r, c);
+            }
+            else if (mine_type == 3 && b->gamePhase > 2)
+            {
+                b->proximity_array[r][c] = 2; // Nuclear mine
+                board_assign_special_mines_arrays(b, mine_type, r, c);
+            }
+
             b->back_array[r][c] = 13;
             add_mines--;
         }
@@ -327,7 +412,8 @@ void board_reveal(struct Board *b)
             {
                 b->front_array[row][column] = 13;
             }
-            if (b->front_array[row][column] == 10 && b->back_array[row][column] != 13)
+            if ((b->front_array[row][column] == 10 || b->front_array[row][column] == 12) &&
+                b->back_array[row][column] != 13)
             {
                 b->front_array[row][column] = 15;
             }
@@ -352,6 +438,26 @@ void board_check_won(struct Board *b)
     }
 
     b->game_state = GAME_WON;
+
+    std::cout << "\nnuclear_array:\n";
+    for (unsigned row = 0; row < b->rows; ++row)
+    {
+        for (unsigned col = 0; col < b->columns; ++col)
+        {
+            std::cout << b->nuclear_array[row][col] << " ";
+        }
+        std::cout << "\n";
+    }
+
+    std::cout << "\nproximity_array:\n";
+    for (unsigned row = 0; row < b->rows; ++row)
+    {
+        for (unsigned col = 0; col < b->columns; ++col)
+        {
+            std::cout << b->proximity_array[row][col] << " ";
+        }
+        std::cout << "\n";
+    }
 }
 
 void board_mouse_down(struct Board *b, float x, float y, Uint8 button)
@@ -381,7 +487,7 @@ void board_mouse_down(struct Board *b, float x, float y, Uint8 button)
             }
             else if (button == SDL_BUTTON_RIGHT)
             {
-                if (b->front_array[row][column] > 8 && b->front_array[row][column] < 12)
+                if (b->front_array[row][column] > 8 && b->front_array[row][column] <= 12)
                 {
                     b->right_pressed = true;
                 }
@@ -390,7 +496,7 @@ void board_mouse_down(struct Board *b, float x, float y, Uint8 button)
     }
 }
 
-bool board_mouse_up(struct Board *b, float x, float y, Uint8 button)
+bool board_mouse_up(struct Board *b, float x, float y, Uint8 button, const int &gamePhase)
 {
     b->mine_marked = 0;
 
@@ -458,7 +564,7 @@ bool board_mouse_up(struct Board *b, float x, float y, Uint8 button)
                 }
                 if (b->first_turn && b->game_state != GAME_PLAY)
                 {
-                    if (!board_reset(b, b->mine_count, false))
+                    if (!board_reset(b, b->mine_count, false, b->gamePhase))
                     {
                         return false;
                     }
@@ -480,6 +586,8 @@ bool board_mouse_up(struct Board *b, float x, float y, Uint8 button)
     // Cycles through the mine marking states
     if (button == SDL_BUTTON_RIGHT)
     {
+        // BUG: Doesnt keep cycling after a cell is number 12 (nuclear)
+        std::cout << "Right Clicked on (" << row << ", " << column << ")\n";
         if (b->front_array[row][column] == 9)
         {
             b->front_array[row][column]++;
@@ -492,11 +600,66 @@ bool board_mouse_up(struct Board *b, float x, float y, Uint8 button)
         }
         else if (b->front_array[row][column] == 11)
         {
+            if (gamePhase > 0)
+            {
+                b->front_array[row][column]++;
+                b->mine_marked = -1;
+            }
+            else
+            {
+                b->front_array[row][column] = 9;
+            }
+        }
+        else if (b->front_array[row][column] == 12)
+        {
             b->front_array[row][column] = 9;
+            b->mine_marked = 1;
         }
     }
 
     return true;
+}
+
+// Assigns the interactible positions around a mine for the nuclear or proximity mines
+void board_assign_special_mines_arrays(struct Board *b, int type, int row, int column)
+{
+    std::cout << "Assigning special mine arrays for type: " << type << " at (" << row << ", " << column << ")\n";
+    if (type == 2) // Nuclear mines
+    {
+        for (int dr = -1; dr <= 1; ++dr)
+        {
+            for (int dc = -1; dc <= 1; ++dc)
+            {
+                int nr = row + dr;
+                int nc = column + dc;
+                if (nr >= 0 && nr < (int)b->rows && nc >= 0 && nc < (int)b->columns)
+                {
+                    if (dr != 0 || dc != 0)
+                    {
+                        b->nuclear_array[nr][nc] = 1; // Mark surrounding cells as nuclear
+                    }
+                }
+            }
+        }
+    }
+    else if (type == 3) // Proximity mines
+    {
+        for (int dr = -1; dr <= 1; ++dr)
+        {
+            for (int dc = -1; dc <= 1; ++dc)
+            {
+                int nr = row + dr;
+                int nc = column + dc;
+                if (nr >= 0 && nr < (int)b->rows && nc >= 0 && nc < (int)b->columns)
+                {
+                    if (dr != 0 || dc != 0)
+                    {
+                        b->proximity_array[nr][nc] = 1; // Mark surrounding cells as nuclear
+                    }
+                }
+            }
+        }
+    }
 }
 
 void board_draw(const struct Board *b)

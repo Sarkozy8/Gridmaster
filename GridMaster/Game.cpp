@@ -12,7 +12,7 @@ bool Game::Init()
         return false;
     }
 
-    // Create the SDL window
+    // Create the SDL window for Main Game
     window = SDL_CreateWindow("Grid Master", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_ALWAYS_ON_TOP);
     if (!window)
     {
@@ -20,11 +20,27 @@ bool Game::Init()
         return false;
     }
 
-    // Create the SDL renderer
+    windowHelper = SDL_CreateWindow("Rules", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_ALWAYS_ON_TOP);
+    if (!window)
+    {
+        std::cerr << "SDL Window for Helper didnt create: " << SDL_GetError() << "\n";
+        return false;
+    }
+
+    SDL_SetWindowPosition(windowHelper, 200, 200);
+
+    // Create the SDL renderer for Main Game
     renderer = SDL_CreateRenderer(window, NULL);
     if (!renderer)
     {
         std::cerr << "SDL Renderer didnt create: " << SDL_GetError() << "\n";
+        return false;
+    }
+
+    rendererHelper = SDL_CreateRenderer(windowHelper, NULL);
+    if (!rendererHelper)
+    {
+        std::cerr << "SDL Renderer for Helper didnt create: " << SDL_GetError() << "\n";
         return false;
     }
 
@@ -35,6 +51,12 @@ bool Game::Init()
         if (!SDL_SetWindowIcon(window, iconSurface))
         {
             std::cerr << "Failed to set window icon: " << SDL_GetError() << "\n";
+            SDL_DestroySurface(iconSurface);
+            return false;
+        }
+        if (!SDL_SetWindowIcon(windowHelper, iconSurface))
+        {
+            std::cerr << "Failed to set window icon for Helper: " << SDL_GetError() << "\n";
             SDL_DestroySurface(iconSurface);
             return false;
         }
@@ -82,6 +104,13 @@ bool Game::Init()
         return false;
     }
 
+    // Initialize helper
+    if (!helper_new(&helper, rendererHelper))
+    {
+        std::cerr << "Failed to create helper: " << SDL_GetError() << "\n";
+        return false;
+    }
+
     // Set the initial state
     isRunning = true;
 
@@ -94,7 +123,7 @@ bool Game::Init()
 // Reset everything
 bool Game::GameReset()
 {
-    if (!board_reset(board, mineCount, true))
+    if (!board_reset(board, mineCount, true, gamePhase))
     {
         return false;
     }
@@ -102,6 +131,7 @@ bool Game::GameReset()
     face_default(face);
     clock_reset(clock);
     mines_reset(mines, mineCount);
+    helper_draw(helper, gamePhase); // Draw the helper with the initial game phase
     isPlaying = true;
 
     return true;
@@ -147,7 +177,7 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
     {
         // If hit a mine, it changes the isPLaying state to false, also it changes the face state to lost,
         // and if the right mouse button is pressed, it marks the mine or unkown on top of it
-        if (!board_mouse_up(board, x, y, button))
+        if (!board_mouse_up(board, x, y, button, gamePhase))
         {
             return false;
         }
@@ -168,6 +198,7 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
     {
         face_won(face);
         mines_reset(mines, 0);
+        gamePhase++;
         isPlaying = false;
     }
     // Lost state
@@ -205,17 +236,19 @@ void Game::HandleEvents()
     {
         switch (event.type)
         {
-        case SDL_EVENT_QUIT:
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             isRunning = false;
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            GameMouseDown(event.button.x, event.button.y, event.button.button);
+            if (event.button.windowID == SDL_GetWindowID(window))
+                GameMouseDown(event.button.x, event.button.y, event.button.button);
             break;
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            if (!GameMouseUp(event.button.x, event.button.y, event.button.button))
-            {
-                isPlaying = false;
-            }
+            if (event.button.windowID == SDL_GetWindowID(window))
+                if (!GameMouseUp(event.button.x, event.button.y, event.button.button))
+                {
+                    isPlaying = false;
+                }
             break;
         case SDL_EVENT_KEY_DOWN:
             switch (event.key.scancode)
@@ -227,6 +260,10 @@ void Game::HandleEvents()
                 break;
             }
             break;
+        case SDL_EVENT_MOUSE_MOTION:
+            if (event.motion.windowID == SDL_GetWindowID(window))
+            {
+            }
         default:
             break;
         }
@@ -274,10 +311,15 @@ void Game::Quit()
     window = nullptr;
     SDL_DestroyRenderer(renderer);
     renderer = nullptr;
+    SDL_DestroyWindow(windowHelper);
+    windowHelper = nullptr;
+    SDL_DestroyRenderer(rendererHelper);
+    rendererHelper = nullptr;
     border_free(&border);
     board_free(&board);
     mines_free(&mines);
     clock_free(&clock);
     face_free(&face);
+    helper_free(&helper);
     SDL_Quit();
 }
