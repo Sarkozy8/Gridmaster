@@ -69,7 +69,7 @@ bool face_mouse_click(struct Face *f, float x, float y, bool down)
             {
                 f->image_index = 1;
             }
-            else if (f->image_index == 1)
+            else if (f->image_index == 1 || f->image_index == 5)
             {
                 f->image_index = 0;
                 return true;
@@ -80,7 +80,6 @@ bool face_mouse_click(struct Face *f, float x, float y, bool down)
     {
         f->image_index = 0;
     }
-
     return false;
 }
 
@@ -102,6 +101,11 @@ void face_lost(struct Face *f)
 void face_question(struct Face *f)
 {
     f->image_index = 2;
+}
+
+void face_radiation(struct Face *f)
+{
+    f->image_index = 5;
 }
 
 void face_draw(const struct Face *f)

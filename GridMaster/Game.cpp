@@ -27,6 +27,7 @@ bool Game::Init()
         return false;
     }
 
+    // Set the position of the Helper window so they are not overlapping
     SDL_SetWindowPosition(windowHelper, 200, 200);
 
     // Create the SDL renderer for Main Game
@@ -123,6 +124,12 @@ bool Game::Init()
 // Reset everything
 bool Game::GameReset()
 {
+    // Update mine count for different difficulty
+    if (gamePhase > 1)
+        mineCount = 5;
+    if (gamePhase > 3)
+        mineCount = 10;
+
     if (!board_reset(board, mineCount, true, gamePhase))
     {
         return false;
@@ -133,6 +140,9 @@ bool Game::GameReset()
     mines_reset(mines, mineCount);
     helper_draw(helper, gamePhase); // Draw the helper with the initial game phase
     isPlaying = true;
+    isHoveringNuclear = false;
+    isHoveringProximity = false;
+    deathToogle = false;
 
     return true;
 }
@@ -160,6 +170,26 @@ void Game::GameMouseDown(float x, float y, Uint8 button)
 // Mouse up event handler
 bool Game::GameMouseUp(float x, float y, Uint8 button)
 {
+    std::cout << "\nnuclear_array:\n";
+    for (unsigned row = 0; row < board->rows; ++row)
+    {
+        for (unsigned col = 0; col < board->columns; ++col)
+        {
+            std::cout << board->nuclear_array[row][col] << " ";
+        }
+        std::cout << "\n";
+    }
+
+    std::cout << "\nproximity_array:\n";
+    for (unsigned row = 0; row < board->rows; ++row)
+    {
+        for (unsigned col = 0; col < board->columns; ++col)
+        {
+            std::cout << board->proximity_array[row][col] << " ";
+        }
+        std::cout << "\n";
+    }
+
     // If pressed the up face with left mouse button, it resets the game
     if (button == SDL_BUTTON_LEFT)
     {
@@ -204,8 +234,19 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
     // Lost state
     else if (board_game_state(board) == GAME_LOST)
     {
-        face_lost(face);
+        if (isHoveringNuclear)
+            face_radiation(face);
+        else
+            face_lost(face);
+
         isPlaying = false;
+
+        // Only shake the window if the game is lost once, not every click
+        if (deathToogle == false)
+        {
+            isShaking = true;
+            deathToogle = true;
+        }
     }
     // Reset Face
     else
@@ -215,6 +256,23 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
 
     // If not lost, we keep playing
     return true;
+}
+
+// Shake the window for radiation and losing
+void Game::WindowShake()
+{
+    Uint32 now = SDL_GetTicks();
+    if (now - shakeStartTime < shakeDuration)
+    {
+        int offsetX = (rand() % (2 * shakeMagnitude + 1)) - shakeMagnitude;
+        int offsetY = (rand() % (2 * shakeMagnitude + 1)) - shakeMagnitude;
+        SDL_SetWindowPosition(window, originalWindowX + offsetX, originalWindowY + offsetY);
+    }
+    else
+    {
+        SDL_SetWindowPosition(window, originalWindowX, originalWindowY);
+        isShaking = false;
+    }
 }
 
 // Main game loop
@@ -250,6 +308,61 @@ void Game::HandleEvents()
                     isPlaying = false;
                 }
             break;
+        case SDL_EVENT_MOUSE_MOTION:
+            if (event.motion.windowID == SDL_GetWindowID(window))
+            {
+                if (board->game_state == GAME_PLAY)
+                {
+                    // Check if hovering over the nuclear mine
+                    int hoverRow = -1, hoverCol = -1;
+                    if (IsHoveringNuclear(board, event.motion.x, event.motion.y, hoverRow, hoverCol))
+                    {
+                        if (!isHoveringNuclear)
+                        {
+                            isHoveringNuclear = true;
+                            isShaking = true;
+                            lastHoverNuclearRow = hoverRow;
+                            lastHoverNuclearCol = hoverCol;
+                            nuclearHoverStartTime = SDL_GetTicks();
+                        }
+                    }
+                    else
+                    {
+                        isHoveringNuclear = false;
+                        lastHoverNuclearRow = -1;
+                        lastHoverNuclearCol = -1;
+                    }
+
+                    // Check if hovering close to proximity mine
+                    if (IsHoveringProximity(board, event.motion.x, event.motion.y, hoverRow, hoverCol))
+                    {
+                        if (!isHoveringProximity)
+                        {
+                            isHoveringProximity = true;
+                            lastHoverProximityRow = hoverRow;
+                            lastHoverProximityCol = hoverCol;
+                        }
+                    }
+                    else
+                    {
+                        isHoveringProximity = false;
+                        lastHoverProximityRow = -1;
+                        lastHoverProximityCol = -1;
+                    }
+                    // Check if hover over proximity mine
+                    if (HoverOverProximity(board, event.motion.x, event.motion.y, hoverRow, hoverCol))
+                    {
+                        std::cout << "You died because of Proximity Mine\n";
+                        board->game_state = GAME_LOST;
+                        isHoveringProximity = false;
+                        board_reveal(board);
+                        face_lost(face);
+                        isShaking = true;
+                        isPlaying = false;
+                    }
+                }
+            }
+            break;
         case SDL_EVENT_KEY_DOWN:
             switch (event.key.scancode)
             {
@@ -260,19 +373,42 @@ void Game::HandleEvents()
                 break;
             }
             break;
-        case SDL_EVENT_MOUSE_MOTION:
-            if (event.motion.windowID == SDL_GetWindowID(window))
-            {
-            }
         default:
             break;
         }
     }
 }
 
-// FPS for now amd start the clock
+// Logic for the game states
 void Game::UpdateState()
 {
+    // If hovering over a nuclear mine for more than 10 seconds, end the game
+    if (isHoveringNuclear && (SDL_GetTicks() - nuclearHoverStartTime) >= nuclearHoverDeathlyTime &&
+        board->game_state == GAME_PLAY)
+    {
+        std::cout << "You died\n";
+        board->game_state = GAME_LOST;
+        isHoveringNuclear = true;
+        board_reveal(board);
+        face_radiation(face);
+        isPlaying = false;
+    }
+
+    // Update window position values before shaking
+    if (!isShaking)
+    {
+        shakeStartTime = SDL_GetTicks();
+        SDL_GetWindowPosition(window, &originalWindowX, &originalWindowY);
+    }
+
+    // Keeps shaking the window if hovering over a nuclear mine but stops after death
+    if (isHoveringNuclear && board->game_state == GAME_PLAY)
+        isShaking = true;
+
+    // Check windows if it should shake
+    if (isShaking)
+        WindowShake();
+
     // Calculate delta time
     Uint64 deltaTime = SDL_GetTicks() - lastFrameTime;
 

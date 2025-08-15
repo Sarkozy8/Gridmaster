@@ -60,6 +60,24 @@ class Game
     unsigned int columns = 9;
     unsigned int mineCount = 1;
 
+    // Nuclear sensor
+    Uint64 nuclearHoverStartTime = 0;
+    Uint64 nuclearHoverDeathlyTime = 5000; // milliseconds
+    bool isHoveringNuclear = false;
+    int lastHoverNuclearRow = -1, lastHoverNuclearCol = -1;
+
+    // WIndow shake variables
+    bool isShaking = false;
+    bool deathToogle = false;
+    Uint32 shakeStartTime = 0;
+    Uint32 shakeDuration = 500; // milliseconds
+    int shakeMagnitude = 10;    // pixels
+    int originalWindowX = 0, originalWindowY = 0;
+
+    // Proximity sensor
+    bool isHoveringProximity = false;
+    int lastHoverProximityRow = -1, lastHoverProximityCol = -1;
+
     bool Init(); // Initialize the game
     void Run();  // Main game loop
 
@@ -67,6 +85,7 @@ class Game
     void GameMouseDown(float x, float y, Uint8 button);
     bool GameMouseUp(float x, float y, Uint8 button);
     bool GameReset();    // Reset the board (It happens when mouse up in face)
+    void WindowShake();  // Shake the window for radiation and losing
     void HandleEvents(); // Handles all the events / Inputs
     void UpdateState();  // Only updates FPS for now
     void Render();       // Render all the objects

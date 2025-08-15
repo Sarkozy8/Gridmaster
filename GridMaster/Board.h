@@ -29,6 +29,9 @@ struct Board
     bool first_turn;
     int mine_marked;
     int gamePhase = 0;
+
+    Uint64 nuclear_hover_start_time = 0;
+    bool nuclear_hovering = false;
 };
 
 struct Node
@@ -46,4 +49,8 @@ int board_mine_marked(const struct Board *b);
 bool board_is_pressed(const struct Board *b);
 void board_mouse_down(struct Board *b, float x, float y, Uint8 button);
 bool board_mouse_up(struct Board *b, float x, float y, Uint8 button, const int &gamePhase);
+void board_reveal(struct Board *b);
 void board_draw(const struct Board *b);
+bool IsHoveringNuclear(struct Board *b, float x, float y, int &outRow, int &outCol);
+bool IsHoveringProximity(struct Board *b, float x, float y, int &outRow, int &outCol);
+bool HoverOverProximity(struct Board *b, float x, float y, int &outRow, int &outCol);

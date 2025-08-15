@@ -438,26 +438,57 @@ void board_check_won(struct Board *b)
     }
 
     b->game_state = GAME_WON;
+}
 
-    std::cout << "\nnuclear_array:\n";
-    for (unsigned row = 0; row < b->rows; ++row)
+bool IsHoveringNuclear(struct Board *b, float x, float y, int &outRow, int &outCol)
+{
+    if (x >= b->rect.x && x < b->rect.x + b->rect.w && y >= b->rect.y && y < b->rect.y + b->rect.h)
     {
-        for (unsigned col = 0; col < b->columns; ++col)
+        int row = (int)((y - b->rect.y) / b->piece_size);
+        int col = (int)((x - b->rect.x) / b->piece_size);
+        if (b->nuclear_array[row][col] > 0)
         {
-            std::cout << b->nuclear_array[row][col] << " ";
+            outRow = row;
+            outCol = col;
+            std::cout << "Hovering near a nuclear mine at (" << row << ", " << col << ")\n";
+            return true;
         }
-        std::cout << "\n";
     }
+    return false;
+}
 
-    std::cout << "\nproximity_array:\n";
-    for (unsigned row = 0; row < b->rows; ++row)
+bool IsHoveringProximity(struct Board *b, float x, float y, int &outRow, int &outCol)
+{
+    if (x >= b->rect.x && x < b->rect.x + b->rect.w && y >= b->rect.y && y < b->rect.y + b->rect.h)
     {
-        for (unsigned col = 0; col < b->columns; ++col)
+        int row = (int)((y - b->rect.y) / b->piece_size);
+        int col = (int)((x - b->rect.x) / b->piece_size);
+        if (b->proximity_array[row][col] == 1)
         {
-            std::cout << b->proximity_array[row][col] << " ";
+            outRow = row;
+            outCol = col;
+            std::cout << "Hovering near a proximity mine at (" << row << ", " << col << ")\n";
+            return true;
         }
-        std::cout << "\n";
     }
+    return false;
+}
+
+bool HoverOverProximity(struct Board *b, float x, float y, int &outRow, int &outCol)
+{
+    if (x >= b->rect.x && x < b->rect.x + b->rect.w && y >= b->rect.y && y < b->rect.y + b->rect.h)
+    {
+        int row = (int)((y - b->rect.y) / b->piece_size);
+        int col = (int)((x - b->rect.x) / b->piece_size);
+        if (b->proximity_array[row][col] == 2)
+        {
+            outRow = row;
+            outCol = col;
+            std::cout << "Hover over a proximity mine at (" << row << ", " << col << ")\n";
+            return true;
+        }
+    }
+    return false;
 }
 
 void board_mouse_down(struct Board *b, float x, float y, Uint8 button)
@@ -634,7 +665,7 @@ void board_assign_special_mines_arrays(struct Board *b, int type, int row, int c
                 int nc = column + dc;
                 if (nr >= 0 && nr < (int)b->rows && nc >= 0 && nc < (int)b->columns)
                 {
-                    if (dr != 0 || dc != 0)
+                    if ((dr != 0 || dc != 0) && b->nuclear_array[nr][nc] != 2)
                     {
                         b->nuclear_array[nr][nc] = 1; // Mark surrounding cells as nuclear
                     }
@@ -652,7 +683,7 @@ void board_assign_special_mines_arrays(struct Board *b, int type, int row, int c
                 int nc = column + dc;
                 if (nr >= 0 && nr < (int)b->rows && nc >= 0 && nc < (int)b->columns)
                 {
-                    if (dr != 0 || dc != 0)
+                    if ((dr != 0 || dc != 0) && b->proximity_array[nr][nc] != 2)
                     {
                         b->proximity_array[nr][nc] = 1; // Mark surrounding cells as nuclear
                     }

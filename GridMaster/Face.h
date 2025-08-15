@@ -18,4 +18,5 @@ void face_default(struct Face *f);
 void face_won(struct Face *f);
 void face_lost(struct Face *f);
 void face_question(struct Face *f);
+void face_radiation(struct Face *f);
 void face_draw(const struct Face *f);
