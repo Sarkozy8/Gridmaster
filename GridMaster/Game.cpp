@@ -112,6 +112,13 @@ bool Game::Init()
         return false;
     }
 
+    // Initialize sound
+    if (!sound_new(&sound))
+    {
+        std::cerr << "Failed to create sound.\n";
+        return false;
+    }
+
     // Set the initial state
     isRunning = true;
 
@@ -126,9 +133,9 @@ bool Game::GameReset()
 {
     // Update mine count for different difficulty
     if (gamePhase > 1)
-        mineCount = 5;
+        mineCount = 15;
     if (gamePhase > 3)
-        mineCount = 10;
+        mineCount = 20;
 
     if (!board_reset(board, mineCount, true, gamePhase))
     {
@@ -193,8 +200,12 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
     // If pressed the up face with left mouse button, it resets the game
     if (button == SDL_BUTTON_LEFT)
     {
+
         if (face_mouse_click(face, x, y, false))
         {
+
+            sound_play(sound, SOUND_CLICK);
+
             if (!GameReset())
             {
                 // This tell on the event handler to change the isPLaying state to false
@@ -205,6 +216,9 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
 
     if (isPlaying)
     {
+
+        sound_play(sound, SOUND_CLICK);
+
         // If hit a mine, it changes the isPLaying state to false, also it changes the face state to lost,
         // and if the right mouse button is pressed, it marks the mine or unkown on top of it
         if (!board_mouse_up(board, x, y, button, gamePhase))
@@ -228,8 +242,23 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
     {
         face_won(face);
         mines_reset(mines, 0);
-        gamePhase++;
         isPlaying = false;
+
+        if (gamePhase > 4 && winToggle == false)
+        {
+            sound_play(sound, SOUND_WIN_GRID_MASTER);
+            sound_stop(sound, SOUND_RADIATION);
+            winToggle = true;
+            gamePhase++;
+        }
+
+        else if (winToggle == false)
+        {
+            sound_play(sound, SOUND_WIN);
+            sound_stop(sound, SOUND_RADIATION);
+            winToggle = true;
+            gamePhase++;
+        }
     }
     // Lost state
     else if (board_game_state(board) == GAME_LOST)
@@ -246,12 +275,15 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
         {
             isShaking = true;
             deathToogle = true;
+            sound_play(sound, SOUND_EXPLOSION);
+            sound_stop(sound, SOUND_RADIATION);
         }
     }
     // Reset Face
     else
     {
         face_default(face);
+        winToggle = false;
     }
 
     // If not lost, we keep playing
@@ -261,7 +293,7 @@ bool Game::GameMouseUp(float x, float y, Uint8 button)
 // Shake the window for radiation and losing
 void Game::WindowShake()
 {
-    Uint32 now = SDL_GetTicks();
+    Uint64 now = SDL_GetTicks();
     if (now - shakeStartTime < shakeDuration)
     {
         int offsetX = (rand() % (2 * shakeMagnitude + 1)) - shakeMagnitude;
@@ -357,8 +389,11 @@ void Game::HandleEvents()
                         isHoveringProximity = false;
                         board_reveal(board);
                         face_lost(face);
+                        sound_play(sound, SOUND_EXPLOSION);
+                        sound_stop(sound, SOUND_RADIATION);
                         isShaking = true;
                         isPlaying = false;
+                        deathToogle = true;
                     }
                 }
             }
@@ -391,7 +426,26 @@ void Game::UpdateState()
         isHoveringNuclear = true;
         board_reveal(board);
         face_radiation(face);
+        sound_play(sound, SOUND_EXPLOSION);
+        sound_stop(sound, SOUND_RADIATION);
         isPlaying = false;
+        deathToogle = true;
+    }
+
+    // If hovering near a proximity mine, play radiation sound
+    if (isHoveringNuclear && board->game_state == GAME_PLAY)
+    {
+        sound_play(sound, SOUND_RADIATION);
+    }
+    else if (!isHoveringNuclear && board->game_state == GAME_PLAY)
+    {
+        sound_stop(sound, SOUND_RADIATION);
+    }
+
+    // If hovering near a proximity mine, play beep sound
+    if (isHoveringProximity && board->game_state == GAME_PLAY)
+    {
+        sound_play(sound, SOUND_BEEP);
     }
 
     // Update window position values before shaking
@@ -415,7 +469,7 @@ void Game::UpdateState()
     // Limit the frame rate to 60 FPS
     if (deltaTime < 16) // Reason for 16: 1000ms / 60fps = ~16ms per frame
     {
-        SDL_Delay(16 - deltaTime);
+        SDL_Delay(static_cast<Uint32>(16 - deltaTime));
     }
 
     lastFrameTime = SDL_GetTicks(); // Update last frame time
@@ -457,5 +511,6 @@ void Game::Quit()
     clock_free(&clock);
     face_free(&face);
     helper_free(&helper);
+    sound_free(&sound);
     SDL_Quit();
 }

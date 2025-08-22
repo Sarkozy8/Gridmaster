@@ -10,6 +10,7 @@
 #include "Mines.h"
 #include "Face.h"
 #include "Helper.h"
+#include "Sound.h"
 
 #define WINDOW_WIDTH 328
 #define WINDOW_HEIGHT 414
@@ -45,6 +46,7 @@ class Game
     struct Clock *clock = nullptr;
     struct Face *face = nullptr;
     struct Helper *helper = nullptr;
+    struct Sound *sound = nullptr;
     SDL_Event event;
 
     // Game state variables
@@ -58,7 +60,7 @@ class Game
     // Game configuration (Do not change Rows and Columns values, it is not implemented yet)
     unsigned int rows = 9;
     unsigned int columns = 9;
-    unsigned int mineCount = 1;
+    unsigned int mineCount = 10;
 
     // Nuclear sensor
     Uint64 nuclearHoverStartTime = 0;
@@ -69,14 +71,17 @@ class Game
     // WIndow shake variables
     bool isShaking = false;
     bool deathToogle = false;
-    Uint32 shakeStartTime = 0;
-    Uint32 shakeDuration = 500; // milliseconds
-    int shakeMagnitude = 10;    // pixels
+    Uint64 shakeStartTime = 0;
+    Uint64 shakeDuration = 500; // milliseconds
+    int shakeMagnitude = 3;     // pixels
     int originalWindowX = 0, originalWindowY = 0;
 
     // Proximity sensor
     bool isHoveringProximity = false;
     int lastHoverProximityRow = -1, lastHoverProximityCol = -1;
+
+    // Misc variables
+    bool winToggle = false; // Toggle for win sound, so it doesn't play every frame
 
     bool Init(); // Initialize the game
     void Run();  // Main game loop
